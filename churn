@@ -1,4 +1,5 @@
 getwd()
+setwd()
 tele<-read.csv("telecomfinal.csv", stringsAsFactors = T)
 options(scipen = 999)
 library(dplyr)
