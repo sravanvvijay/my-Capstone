@@ -1,0 +1,43 @@
+import unittest
+import pandas as pd
+import NEWCUSTOMERINFORMATIONANALYZER  as NEWCUST
+class TestNewModel(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.QA_txt=pd.read_csv("/dnbusr1/fpcuser/data21/FPC.TESTSIVA.AE100620.TR968M.IA.TXT")
+        cls.QA_txt2=pd.read_csv("/dnbusr1/fpcuser/data21/FPC.TESTSIVA.AE100620.TR968M.IA.TXT2")
+        cls.QA_txt4=pd.read_csv("/dnbusr1/fpcuser/data21/FPC.TESTSIVA.AE100620.TR968M.IA.TXT4")
+        cls.QA_txt5=pd.read_csv("/dnbusr1/fpcuser/data21/FPC.TESTSIVA.AE100620.TR968M.IA.TXT5")
+        cls.QA_txt6=pd.read_csv("/dnbusr1/fpcuser/data21/FPC.TESTSIVA.AE100620.TR968M.IA.TXT6")
+
+    def test_txt1_check(cls):
+        Actual_txt=pd.read_csv(NEWCUST.OUT1)
+        pd.testing.assert_frame_equal(Actual_txt,cls.QA_txt,check_dtype=False)
+        print("[PASS].....NEWCUSTOMERINFORMATIONANALYZER.... Txt count check ..............[PASS]")
+
+
+    def test_txt2_check(cls):
+        Actual_txt2=pd.read_csv(NEWCUST.OUT2)
+        pd.testing.assert_frame_equal(Actual_txt2,cls.QA_txt2,check_dtype=False)
+        print("[PASS].....NEWCUSTOMERINFORMATIONANALYZER.... Txt2 count check ..............[PASS]")
+
+    def test_txt4_check(cls):
+        Actual_txt4=pd.read_csv(NEWCUST.OUT4)
+        pd.testing.assert_frame_equal(Actual_txt4,cls.QA_txt4,check_dtype=False)
+        print("[PASS].....NEWCUSTOMERINFORMATIONANALYZER.... Txt4 count check ..............[PASS]")
+
+    def test_txt5_check(cls):
+        Actual_txt5=pd.read_csv(NEWCUST.OUT5)
+        pd.testing.assert_frame_equal(Actual_txt5,cls.QA_txt5,check_dtype=False)
+        print("[PASS].....NEWCUSTOMERINFORMATIONANALYZER.... Txt5 count check ..............[PASS]")
+
+    def test_txt6_check(cls):
+        Actual_txt6=pd.read_csv(NEWCUST.OUT6)
+        pd.testing.assert_frame_equal(Actual_txt6,cls.QA_txt6,check_dtype=False)
+        print("[PASS].....NEWCUSTOMERINFORMATIONANALYZER.... Txt6 count check ..............[PASS]")
+
+
+if __name__=="__main__":
+    unittest.main(argv=['first-arg-is-ignored'],exit=False)
+#     unittest.main()
+
