@@ -1,0 +1,29 @@
+
+export PATH="/dnbusr1/fpcuser/anaconda3/bin:$PATH"
+
+outpath=/dnbusr1/fpcuser
+id=$outpath/out.txt
+PATH=/dnbusr1/fpcuser/outfiles
+MAPPATH=/dnbusr1/fpcuser/outfiles
+RLOGIN='A'
+RPASSWORD='B'
+ROUTPATH=/outfiles
+FILENAME=COG.TEST.CFP.ASFILES
+RSERVERNAME='C'
+
+python AG1.py  "${id}" "${MAPPATH}" "${FILENAME}" "$RSERVERNAME" "$RLOGIN" "$RPASSWORD" "$ROUTPATH"
+
+
+export PATH="/dnbusr1/fpcuser/anaconda3/bin:$PATH"
+
+
+outpath=/dnbusr1/fpcuser
+id=$outpath/out.txt
+MAPPATH=/dnbusr1/fpcuser/outfiles
+FILENAME=COG.TEST.CFP.ASFILES
+RSERVERNAME='A'
+RLOGIN='B'
+RPASSWORD='C'
+ROUTPATH='D'
+
+python AG1.py  "${id}" "${MAPPATH}" "${FILENAME}" "$RSERVERNAME" "$RLOGIN" "$RPASSWORD" "$ROUTPATH"
