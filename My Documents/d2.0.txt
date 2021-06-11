@@ -1,0 +1,1239 @@
+#DCCUSTOMER ANALAYZER.py####
+import pandas as pd
+import numpy as np
+import math
+import logging
+import sys
+import re
+from functools import reduce
+
+#inpath='/dnbusr1/fpcuser/data1/FPC.XILINXXX.CW080320.TR809C.AZMAP'
+#inpath='/dnbusr1/fpcuser/data1/FPC.XILINXXX.D0080420.TR994C.AZMAP'
+#inpath='/dnbusr1/fpcuser/data1/FPC.ROCKWELL.CX080620.TR364D.AZMAP'
+#inpath='/dnbusr1/fpcuser/data1/FPC.INJUREDW.B7081520.TR111F.AZMAP'
+
+#inpath1='/dnbusr1/fpcuser/data1/FPC.XILINXXX.CW080320.TR809C'
+#inpath1='/dnbusr1/fpcuser/data1/FPC.XILINXXX.D0080420.TR994C'
+#inpath1='/dnbusr1/fpcuser/data1/FPC.ROCKWELL.CX080620.TR364D'
+#inpath1='/dnbusr1/fpcuser/data1/FPC.INJUREDW.B7081520.TR111F'
+
+outpath_log=sys.argv[1]
+MAPPATH=sys.argv[2]
+FILENAME=sys.argv[3]
+RSERVERNAME=sys.argv[4]
+RLOGIN=sys.argv[5]
+RPASSWORD=sys.argv[6]
+ROUTPATH=sys.argv[7]
+outpath=sys.argv[8]
+
+
+inpath =MAPPATH+'/'+FILENAME+'.AZMAP'
+inpath1=MAPPATH+'/'+FILENAME
+
+OUT1=outpath+'/'+FILENAME+'.IA.TXT'
+OUT2=outpath+'/'+FILENAME+'.IA.TXT2'
+OUT3=outpath+'/'+FILENAME+'.IA.TXT3'
+OUT4=outpath+'/'+FILENAME+'.IA.TXT4'
+OUT5=outpath+'/'+FILENAME+'.IA.TXT5'
+OUT6=outpath+'/'+FILENAME+'.IA.TXT6'
+
+
+logfile =outpath_log
+
+logging.basicConfig(filename=logfile,filemode='w',
+                    level=logging.DEBUG,
+                    format="%(asctime)s :: %(levelname)s ::%(message)s")
+
+head_check=['BUSINESS_NAME','ADDRESSL1','ADDRESSL2','CITY','STATE','ZIP','PHONE','COUNTRYNAME']
+
+dtypes={'variables':str,'start_pos':str,'end_pos':str}
+
+data=pd.read_csv(inpath,names=['variables','start_pos','end_pos'],dtype=dtypes)
+
+
+data.drop(data[(data['variables'].isin(head_check)==False)].index,inplace=True)
+
+#colum position creation from layout file
+varnames=data['variables'].tolist()
+df=data.drop(['variables'],axis=1)
+df['end_pos']=df['end_pos'].astype(int)
+df['start_pos']=df['start_pos'].astype(int)
+df['start_pos']=df.apply(lambda x:x['start_pos']-1,axis=1)
+df['end_pos']=df.apply(lambda x:x['end_pos'],axis=1)
+li_df=df.values.tolist()
+col_specs=tuple(li_df)
+#print(col_specs)
+#print(data)
+
+# Read the base file using the layout file column positions created
+
+data1=pd.read_fwf(inpath1,colspecs=col_specs,header=None,names=varnames,na_filter=False)
+
+#print(data1)
+
+#print(data1.info())
+
+def gradecheck(VALD_PCT):
+    if (VALD_PCT >= 98):
+          GRADE ='A+'
+          GRADE_COMMENT='98-100'
+    elif (VALD_PCT >= 95 and VALD_PCT < 98):
+          GRADE ='A'
+          GRADE_COMMENT='95-97.99'
+    elif (VALD_PCT >= 92 and VALD_PCT < 95):
+          GRADE ='A-'
+          GRADE_COMMENT='92-94.99'
+    elif (VALD_PCT >= 89 and VALD_PCT < 92):
+          GRADE ='B+'
+          GRADE_COMMENT='89-91.99'
+    elif (VALD_PCT >= 86 and VALD_PCT < 89):
+          GRADE ='B'
+          GRADE_COMMENT='86-88.99'
+    elif (VALD_PCT >= 83 and VALD_PCT < 86):
+          GRADE ='B-'
+          GRADE_COMMENT='83-85.99'
+    elif (VALD_PCT >= 80 and VALD_PCT < 83):
+          GRADE ='C+'
+          GRADE_COMMENT='80-82.99'
+    elif (VALD_PCT >= 77 and VALD_PCT < 80):
+          GRADE ='C'
+          GRADE_COMMENT='77-79.99'
+    elif (VALD_PCT >= 74 and VALD_PCT < 77):
+          GRADE ='C-'
+          GRADE_COMMENT='74-76.99'
+    elif (VALD_PCT >= 71 and VALD_PCT < 74):
+          GRADE ='D+'
+          GRADE_COMMENT='71-73.99'
+    elif (VALD_PCT >= 68 and VALD_PCT < 71):
+          GRADE ='D'
+          GRADE_COMMENT='68-70.99'
+    elif (VALD_PCT >= 65 and VALD_PCT < 68):
+          GRADE ='D-'
+          GRADE_COMMENT='65-67.99'
+    else:
+          GRADE ='F'
+          GRADE_COMMENT='<65'
+
+    return [GRADE, GRADE_COMMENT]
+
+
+
+#Text4 File Generation
+def textfilegen(columnName):
+    with open(OUT4,'a') as prtfil1:
+         for x in range(1,15):
+             discnt=0
+             for y in TOTAL_VAL_REC['count']:
+                 if x==y:
+                    cnt=TOTAL_VAL_REC.loc[TOTAL_VAL_REC['count']==y,'count1']
+                    cnt=list(cnt)
+                    cnt=int(cnt[0])
+                    pct=round((cnt/TOTAL_VAL)*100)
+                    stline=columnName+PIPE+Format[x]+PIPE+str(cnt)+PIPE+str(pct)+'%'+'\n'
+                    prtfil1.write(stline)
+                    discnt=1
+             if discnt!=1:
+                 stline=columnName+PIPE+Format[x]+PIPE+'0'+PIPE+'0%'+'\n'
+                 prtfil1.write(stline)
+
+
+
+#Text File4 Template
+Format={1:' 1      ',2:' 2      ',3:' 3      ',4:' 4      ',5:' 5      ',6:' 6      ',7:' 7      ',8:' 8      ',9:' 9      ',10:'10 - 19',11:'20 - 29',12:'30 - 39',13:'40 - 49',14:'50+'}
+
+#Spreadsheetfill file creation
+
+def spreadsheetfile():
+    with open('/dnbusr1/fpcuser/csvfile.txt','a') as csvfile:
+         csvfile.write(" , ")
+         csvfile.write("TOTAL RECORDS ON FILE = ,")
+         csvfile.write("TOTAL VALID RECORDS ON FILE = , ")
+         csvfile.write("TOTAL INAPPROPRIATE RECORDS ON FILE =, ")
+         csvfile.write("TOTAL BLANK RECORDS ON FILE =, ")
+         csvfile.write("TOTAL NUMBER OF UNIQUE RECORDS = ,  ")
+         csvfile.write("TOTAL NUMBER OF DUPLICATE RECORDS = , ")
+         csvfile.write(" , ")
+         csvfile.write("FIELD FREQUENCY REPORT - DUPLICATES , VARIABLE NOT DEFINED")
+         csvfile.write("TOP 25 RECORDS")
+         csvfile.write(" , ")
+         for i in range(0,25):
+             csvfile.write('INSUFFIENT DATA - LINES ADDED FOR FILL')
+
+         csvfile.write("FIELD FREQUENCY REPORT - UNIQUE , VARIABLE NOT DEFINED")
+         csvfile.write("RANDOM 25 RECORDS")
+         csvfile.write(" , ")
+         for i in range(0,25):
+             csvfile.write('INSUFFIENT DATA - LINES ADDED FOR FILL')
+         csvfile.write("FIELD FREQUENCY REPORT - , VARIABLE NOT DEFINED")
+         csvfile.write("  ")
+         for i in range(0,14):
+             csvfile.write('INSUFFIENT DATA - LINES ADDED FOR FILL')
+
+
+TOTAL_REC=[]
+TOTAL_BLNK=[]
+PCT_BLNK=[]
+TOTAL_INVALD=[]
+INVALID_PCT=[]
+TOTAL_VALD=[]
+VALID_PCT=[]
+BLANK_PCT=[]
+INVALID_PCT=[]
+TOTAL_UNIQUE=[]
+PCT_UNIQUE=[]
+TOTAL_DUPS=[]
+PCT_DUPS=[]
+TOTAL_INAPR=[]
+PER_INVALID=[]
+Grade=[]
+Grade_Comment=[]
+Invalid_Names=0
+Alldata=[]
+cnt=0
+Trans=' '
+dupchk='DUPLICATES'
+alpchk='ALPHA'
+PIPE='|'
+
+for columnName in data1.columns:
+
+#VALIDATE-----Company Name
+    if (columnName == "BUSINESS_NAME"):
+
+        df1=pd.DataFrame(data1[columnName],columns=['BUSINESS_NAME','Blank','Invalid'])
+        TOTAL=(df1[columnName].shape[0])
+#1.blank check
+        df1.loc[df1[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+# invalid-badnames and company names list
+        Badnames=['TEST','TESTING','INVALID','UNKNOWN','NONE','SAMPLE','JOHN DOE','TBD','TO FOLLOW']
+
+        Invalid_CompanyNames=['ABCCOMPANY','ABCINC','ABCCO','XYZCOMPANY','XYZINC','XYZCO','NOCOMPANY','NOINC','NOCO']
+        UPCASE=df1[columnName].str.upper()
+        df1.loc[(UPCASE.isin(Invalid_CompanyNames)==True),['Invalid']]=['Y']
+
+
+#3.Address only special characters/only special & Numeric only/first letter with Alphanumeric/Repeated character check
+
+        for val in (df1[columnName]):
+            Invalid=0
+            if (val != ""):
+
+                specnum=re.findall('[^a-zA-Z]',val)
+                if len(specnum)==len(val):
+                   Invalid=1
+
+                firstalpnum=re.findall('[^a-zA-Z0-9]',val[0])
+                if len(firstalpnum)>0:
+                   Invalid=1
+
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+
+                val1=val.upper()
+                res=[x for x in Badnames if re.search(x,val1)]
+                if len(res)>0:
+                   Invalid=1
+
+                speclower=re.findall('[^A-Z0-9]',val)
+                if len(speclower)==len(val):
+                   Invalid=1
+
+                val1="".join(val.split())
+                if val1.islower():
+                   if val1.isalpha():
+                      print(val1)
+                      Invalid=0
+
+                if Invalid==1:
+                   df1.loc[(df1[columnName]==val),['Invalid']]=['Y']
+
+
+        Name=df1.copy(deep=False)
+        Name.loc[:,'Invalid_Name']=0
+        Name.loc[(Name['Invalid']=='Y')| (Name['Blank']=='Y'),['Invalid_Name']]=[1]
+        Name['seqnum']=Name.index+1
+        Name.drop(['BUSINESS_NAME','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(Name)
+
+        TOTAL_INVAL=((df1['Invalid']=='Y') & (df1['Blank']!='Y')).sum()
+
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1['Invalid']!='Y')& (df1['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1[(df1['Invalid']!='Y')& (df1['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+
+        TOTAL_DUP=df1[(df1['Invalid']!='Y')& (df1['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1[columnName]=df1[columnName].replace('','Blank')
+        Freq=df1.groupby(df1[columnName]).size().to_frame(name='count').reset_index()
+        Freq1=Freq.sort_values(by='BUSINESS_NAME',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+
+
+        Dups=Freq.sort_values(by=['count','BUSINESS_NAME'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varnames[0]+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3 ,'w') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varnames[0]+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3 ,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+#VALIDATE ---------- ADDRESSL1
+    if (columnName == "ADDRESSL1"):
+
+        df1_ADDRESSL1=pd.DataFrame(data1[columnName],columns=['ADDRESSL1','Blank','Invalid'])
+        TOTAL=(data1[columnName].shape[0])
+#1.blank char check
+        df1_ADDRESSL1.loc[df1_ADDRESSL1[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_ADDRESSL1[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+#2.Invalid Contents check
+        Badnames=['UNKNOWN','NONE','TBD','TO FOLLOW','ADDRESS','P.O. BOX','PO BOX','SUITE','STE','ST','APT','APARTMENT','FLR','FLOOR','BLDG','DO NOT USE','BUILDING']
+        UPCASE=df1_ADDRESSL1[columnName].str.upper()
+        df1_ADDRESSL1.loc[(UPCASE.isin(Badnames)==True),['Invalid']]=['Y']
+
+#3.Address only special characters/only special & Numeric only/first letter with Alphanumeric/Repeated character check
+
+        for val in (df1_ADDRESSL1[columnName]):
+            Invalid=0
+            if (val != ""):
+
+                specnum=re.findall('[^A-Z0-9]',val)
+                if len(specnum)==len(val):
+                   Invalid=1
+
+                firstalpnum=re.findall('[^a-zA-Z0-9]',val[0])
+                if len(firstalpnum)>0:
+                   Invalid=1
+
+                speclower=re.findall('[^A-Z]',val)
+                if len(speclower)==len(val):
+                    Invalid=1
+
+                val1="".join(val.split())
+                if val1.islower():
+                   if val1.isalpha():
+                      Invalid=0
+
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+
+                if Invalid==1:
+                   df1_ADDRESSL1.loc[(df1_ADDRESSL1[columnName]==val),['Invalid']]=['Y']
+
+#4. Length of address is less than 3
+        df1_ADDRESSL1.loc[(df1_ADDRESSL1[columnName].str.len() < 3),['Invalid']]=['Y']
+
+#5. if address contain only numerics
+        df1_ADDRESSL1.loc[(df1_ADDRESSL1[columnName].str.isnumeric()),['Invalid']]=['Y']
+
+        Address1=df1_ADDRESSL1.copy(deep=False)
+        Address1.loc[:,'Invalid_Address1']=0
+        Address1.loc[(Address1['Invalid']=='Y')| (Address1['Blank']=='Y'),['Invalid_Address1']]=[1]
+        Address1['seqnum']=Address1.index+1
+        Address1.drop(['ADDRESSL1','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(Address1)
+
+#        pd.set_option('display.max_rows',916)
+#        print(df1_ADDRESSL1[(df1_ADDRESSL1['Invalid']=='Y') & (df1_ADDRESSL1['Blank']!='Y')])
+#        pd.reset_option('display.max_rows')
+
+
+        TOTAL_INVAL=((df1_ADDRESSL1['Invalid']=='Y') & (df1_ADDRESSL1['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_ADDRESSL1['Invalid']!='Y')& (df1_ADDRESSL1['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_ADDRESSL1[(df1_ADDRESSL1['Invalid']!='Y')& (df1_ADDRESSL1['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+        TOTAL_DUP=df1_ADDRESSL1[(df1_ADDRESSL1['Invalid']!='Y')& (df1_ADDRESSL1['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_ADDRESSL1.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_ADDRESSL1['ADDRESSL1']=df1_ADDRESSL1['ADDRESSL1'].replace('','Blank')
+        Freq=df1_ADDRESSL1.groupby(df1_ADDRESSL1['ADDRESSL1']).size().to_frame(name='count').reset_index()
+        Freq1=Freq.sort_values(by='ADDRESSL1',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+        Freq1=Freq1[Freq1['count']==1]
+        Dups=Freq.sort_values(by=['count','ADDRESSL1'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+
+#VALIDATE ---------- ADDRESSL2
+    if (columnName == "ADDRESSL2"):
+
+        df1_ADDRESSL2=pd.DataFrame(data1[columnName],columns=['ADDRESSL2','Blank','Invalid'])
+        TOTAL=(data1[columnName].shape[0])
+#1.blank char check
+        df1_ADDRESSL2.loc[df1_ADDRESSL2[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_ADDRESSL2[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+#2.Invalid Contents check
+        Badnames=['UNKNOWN','NONE','TBD','TO FOLLOW','ADDRESS','P.O. BOX','PO BOX','SUITE','STE','ST','APT','APARTMENT','FLR','FLOOR','BLDG','DO NOT USE','BUILDING']
+        UPCASE=df1_ADDRESSL2[columnName].str.upper()
+        df1_ADDRESSL2.loc[(UPCASE.isin(Badnames)==True),['Invalid']]=['Y']
+
+#3.Address only special characters/only special & Numeric only/first letter with Alphanumeric/Repeated character check
+
+        for val in (df1_ADDRESSL2[columnName]):
+            Invalid=0
+            if (val != ""):
+
+                specnum=re.findall('[^a-zA-Z]',val)
+                if len(specnum)==len(val):
+                   Invalid=1
+
+                firstalpnum=re.findall('[^a-zA-Z0-9]',val[0])
+                if len(firstalpnum)>0:
+                   Invalid=1
+
+                speclower=re.findall('[^A-Z]',val)
+                if len(speclower)==len(val):
+                   Invalid=1
+
+                val1="".join(val.split())
+                if val1.islower():
+                   if val1.isalpha():
+                      Invalid=0
+
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+
+                if Invalid==1:
+                   df1_ADDRESSL2.loc[(df1_ADDRESSL2[columnName]==val),['Invalid']]=['Y']
+
+#4. Length of address is less than 3
+        df1_ADDRESSL2.loc[(df1_ADDRESSL2[columnName].str.len() < 3),['Invalid']]=['Y']
+
+#5. if address contain only numerics
+        df1_ADDRESSL2.loc[(df1_ADDRESSL2[columnName].str.isnumeric()),['Invalid']]=['Y']
+
+        Address2=df1_ADDRESSL2.copy(deep=False)
+        Address2.loc[:,'Invalid_Address2']=0
+        Address2.loc[( Address2['Invalid']=='Y')| (Address2['Blank']=='Y'),['Invalid_Address2']]=[1]
+        Address2['seqnum']=Address2.index+1
+        Address2.drop(['ADDRESSL2','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(Address2)
+
+        TOTAL_INVAL=((df1_ADDRESSL2['Invalid']=='Y')& (df1_ADDRESSL2['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_ADDRESSL2['Invalid']!='Y')& (df1_ADDRESSL2['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_ADDRESSL2[(df1_ADDRESSL2['Invalid']!='Y')& (df1_ADDRESSL2['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+        TOTAL_DUP=df1_ADDRESSL2[(df1_ADDRESSL2['Invalid']!='Y')& (df1_ADDRESSL2['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_ADDRESSL2.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_ADDRESSL2['ADDRESSL2']=df1_ADDRESSL2['ADDRESSL2'].replace('','Blank')
+        Freq=df1_ADDRESSL2.groupby(df1_ADDRESSL2['ADDRESSL2']).size().to_frame(name='count').reset_index()
+
+        Freq1=Freq.sort_values(by='ADDRESSL2',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+        Dups=Freq.sort_values(by=['count','ADDRESSL2'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+#VALIDATE------- CITY
+    if (columnName == "CITY"):
+
+        df1_CITY=pd.DataFrame(data1[columnName],columns=['CITY','Blank','Invalid'])
+        Digits=['1','2','3','4','5','6','7','8','9','0']
+        TOTAL=(df1_CITY[columnName].shape[0])
+#1.blank check
+        df1_CITY.loc[df1_CITY[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_CITY[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+# city must be atleast 3 characters
+        df1_CITY.loc[(df1_CITY[columnName].str.len() < 3),['Invalid']]=['Y']
+
+
+#3.Address only special characters/only special & Numeric only/first letter with Alphanumeric/Repeated character check
+
+        for val in (df1_CITY[columnName]):
+            Invalid=0
+            if (val != ""):
+
+                specnum=re.findall('[^a-zA-Z]',val)
+                if len(specnum)==len(val):
+                   Invalid=1
+
+                speclower=re.findall('[^A-Z]',val)
+                if len(speclower)==len(val):
+                   Invalid=1
+
+                res=[x for x in Digits if re.search(x,val)]
+                if len(res)>0:
+                   Invalid=1
+
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+
+                if Invalid==1:
+                   df1_CITY.loc[(df1_CITY[columnName]==val),['Invalid']]=['Y']
+
+        City=df1_CITY.copy(deep=False)
+        City.loc[:,'Invalid_City']=0
+        City.loc[(City['Invalid']=='Y')| (City['Blank']=='Y'),['Invalid_City']]=[1]
+        City['seqnum']=City.index+1
+        City.drop(['CITY','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(City)
+
+        TOTAL_INVAL=((df1_CITY['Invalid']=='Y') & (df1_CITY['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_CITY['Invalid']!='Y')& (df1_CITY['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_CITY[(df1_CITY['Invalid']!='Y')& (df1_CITY['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+        TOTAL_DUP=df1_CITY[(df1_CITY['Invalid']!='Y')& (df1_CITY['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_CITY.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_CITY['CITY']=df1_CITY['CITY'].replace('','Blank')
+        Freq=df1_CITY.groupby(df1_CITY['CITY']).size().to_frame(name='count').reset_index()
+        Freq1=Freq.sort_values(by='CITY',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+
+        Dups=Freq.sort_values(by=['count','CITY'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+
+#VALIDATE----- STATE
+    if (columnName == "STATE"):
+
+        df1_STATE=pd.DataFrame(data1[columnName],columns=['STATE','Blank','Invalid'])
+        TOTAL=(data1[columnName].shape[0])
+#1.Blank Check
+        df1_STATE.loc[df1_STATE[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_STATE[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+#2.State Must be atleast two chars
+        df1_STATE.loc[(df1_STATE[columnName].str.len() < 2),['Invalid']]=['Y']
+
+#3.State special characters/only special & Numeric only/Repeated character check/Any Numeric check
+
+        for val in (df1_STATE[columnName]):
+            Invalid=0
+            if (val != ""):
+                charRe = re.findall('[^a-zA-Z0-9]',val)
+                if len(charRe)==len(val):
+                   Invalid=1
+
+                specnum=re.findall('[^a-zA-Z]',val)
+                if len(specnum)==len(val):
+                   Invalid=1
+
+                firstalpnum=re.findall('[^a-zA-Z0-9]',val[0])
+                if len(firstalpnum)>0:
+                   Invalid=1
+
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+
+                if Invalid==1:
+                   df1_STATE.loc[(df1_STATE[columnName]==val),['Invalid']]=['Y']
+                   cnt=cnt +1
+
+#4 is numeric check
+        df1_STATE.loc[(df1_STATE[columnName].str.isnumeric()),['Invalid']]=['Y']
+#5 first letter digit check
+        df1_STATE.loc[(df1_STATE[columnName].str.isdigit()==True),['Invalid']]=['Y']
+
+        State=df1_STATE.copy(deep=False)
+        State.loc[:,'Invalid_State']=0
+        State.loc[(State['Invalid']=='Y')| (State['Blank']=='Y'),['Invalid_State']]=[1]
+        State['seqnum']=State.index+1
+        State.drop(['STATE','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(State)
+
+        TOTAL_INVAL=((df1_STATE['Invalid']=='Y') & (df1_STATE['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_STATE['Invalid']!='Y')& (df1_STATE['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_STATE[(df1_STATE['Invalid']!='Y')& (df1_STATE['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+
+        TOTAL_DUP=df1_STATE[(df1_STATE['Invalid']!='Y')& (df1_STATE['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_STATE.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_STATE['STATE']=df1_STATE['STATE'].replace('','Blank')
+        Freq=df1_STATE.groupby(df1_STATE['STATE']).size().to_frame(name='count').reset_index()
+
+        Freq1=Freq.sort_values(by='STATE',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+
+        Dups=Freq.sort_values(by=['count','STATE'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+#VALIDATE------PHONE
+    if (columnName == "PHONE"):
+
+        df1_PHONE=pd.DataFrame(data1[columnName],columns=['PHONE','Blank','Invalid'])
+
+        TOTAL=(df1_PHONE[columnName].shape[0])
+#1.blank check
+        df1_PHONE.loc[df1_PHONE[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_PHONE[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+#2.State special characters/only special & Alpha only/Repeated character check
+
+        for val in (df1_PHONE[columnName]):
+            Invalid=0
+            if (val != ""):
+                charRe = re.findall('[^a-zA-Z0-9]',val)
+                if len(charRe)==len(val):
+                   Invalid=1
+
+                specalpha=re.findall('[^0-9]',val)
+                if len(specalpha)==len(val):
+                   Invalid=1
+
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+#3.Invalid Length Check if not 10
+        Invalid_len_10=(df1_PHONE[columnName].str.len()!=10)
+        df1_PHONE.loc[Invalid_len_10,['Invalid']]=['Y']
+
+        Phone=df1_PHONE.copy(deep=False)
+        Phone.loc[:,'Invalid_Phone']=0
+        Phone.loc[(Phone['Invalid']=='Y')| (Phone['Blank']=='Y'),['Invalid_Phone']]=[1]
+        Phone['seqnum']=Phone.index+1
+        Phone.drop(['PHONE','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(Phone)
+
+        TOTAL_INVAL=((df1_PHONE['Invalid']=='Y') & (df1_PHONE['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_PHONE['Invalid']!='Y')& (df1_PHONE['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_PHONE[(df1_PHONE['Invalid']!='Y')& (df1_PHONE['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+        TOTAL_DUP=df1_PHONE[(df1_PHONE['Invalid']!='Y')& (df1_PHONE['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_PHONE.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_PHONE['PHONE']=df1_PHONE['PHONE'].replace('','Blank')
+        Freq=df1_PHONE.groupby(df1_PHONE['PHONE']).size().to_frame(name='count').reset_index()
+
+        Freq1=Freq.sort_values(by='PHONE',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+
+        Dups=Freq.sort_values(by=['count','PHONE'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+
+
+#VALIDATE------ZIPCODE
+    if (columnName == "ZIP"):
+
+        data1[columnName]=data1[columnName].astype(str)
+        df1_ZIP=pd.DataFrame(data1[columnName],columns=['ZIP','Blank','Invalid'])
+
+        TOTAL=(df1_ZIP[columnName].shape[0])
+#1.blank check
+        df1_ZIP.loc[df1_ZIP[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_ZIP[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+# city must be atleast 3 characters
+        df1_ZIP.loc[(df1_ZIP[columnName].str.len() < 3),['Invalid']]=['Y']
+
+
+#3.Address only special characters/only special & Numeric only/first letter with Alphanumeric/Repeated character check
+
+        for val in (df1_ZIP[columnName]):
+            Invalid=0
+            if (val != ""):
+                charRe = re.findall('[^a-zA-Z0-9]',val)
+                if len(charRe)==len(val):
+                   Invalid=1
+                if (val == len(val) *val[0]):
+                    Invalid= 1
+
+#4.leading zeros check
+            has_leadin_zero=re.match(r'000\d+',str(val))
+            bool(has_leadin_zero)
+            if has_leadin_zero==True:
+               Invalid= 1
+            if Invalid==1:
+               df1_ZIP.loc[(df1_ZIP[columnName]==val),['Invalid']]=['Y']
+               cnt=cnt +1
+
+#5.Invalid Length Check if not 5 or 10(including hypen)
+        df1_ZIP[columnName]=df1_ZIP[columnName].str.replace('-','')
+
+        Invalid_len_9=(df1_ZIP[columnName].str.len()!=9)
+        Invalid_len_5=(df1_ZIP[columnName].str.len()!=5)
+        df1_ZIP.loc[((Invalid_len_9)&(Invalid_len_5)),['Invalid']]=['Y']
+
+        Zip=df1_ZIP.copy(deep=False)
+        Zip.loc[:,'Invalid_Zip']=0
+        Zip.loc[(Zip['Invalid']=='Y')| (Zip['Blank']=='Y'),['Invalid_Zip']]=[1]
+        Zip['seqnum']=Zip.index+1
+        Zip.drop(['ZIP','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(Zip)
+
+        TOTAL_INVAL=((df1_ZIP['Invalid']=='Y')& (df1_ZIP['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_ZIP['Invalid']!='Y')& (df1_ZIP['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_ZIP[(df1_ZIP['Invalid']!='Y')& (df1_ZIP['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+        TOTAL_DUP=df1_ZIP[(df1_ZIP['Invalid']!='Y')& (df1_ZIP['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL - TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_ZIP.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_ZIP['ZIP']=df1_ZIP['ZIP'].replace('','Blank')
+        Freq=df1_ZIP.groupby(df1_ZIP['ZIP']).size().to_frame(name='count').reset_index()
+
+        Freq1=Freq.sort_values(by='ZIP',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+
+        Dups=Freq.sort_values(by=['count','ZIP'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+
+#VALIDATE----------- Country
+    if (columnName == "COUNTRYNAME"):
+
+        df1_COUNTRY=pd.DataFrame(data1[columnName],columns=['COUNTRYNAME','Blank','Invalid'])
+        TOTAL=(data1[columnName].shape[0])
+#1.Blank Check
+        df1_COUNTRY.loc[df1_COUNTRY[columnName]=='','Blank']='Y'
+        TOT_BLK=(df1_COUNTRY[columnName]=='').sum()
+        TOTAL_BLNK.append(TOT_BLK)
+        PCT_BLK = int(round((TOT_BLK/TOTAL)*100))
+        PCT_BLNK.append(PCT_BLK)
+
+
+#2.Invalid content check
+        df1_COUNTRY.loc[(df1_COUNTRY[columnName]=='UNKNOWN'),['Invalid']]=['Y']
+
+#3.State special characters/only special & Numeric only
+        for val in (df1_COUNTRY[columnName]):
+            Invalid=0
+            if (val != ""):
+                charRe = re.findall('[^a-zA-Z0-9]',val)
+                if len(charRe)==len(val):
+                   Invalid=1
+
+                specnum=re.findall('[^a-zA-Z]',val)
+                if len(specnum)==len(val):
+                   Invalid=1
+
+                if Invalid==1:
+                   df1_COUNTRY.loc[(df1_COUNTRY[columnName]==val),['Invalid']]=['Y']
+                   cnt=cnt +1
+
+#4 is numeric check
+        df1_COUNTRY.loc[(df1_COUNTRY[columnName].str.isnumeric()),['Invalid']]=['Y']
+
+        Country=df1_COUNTRY.copy(deep=False)
+        Country.loc[:,'Invalid_Country']=0
+        Country.loc[(Country['Invalid']=='Y')| (Country['Blank']=='Y'),['Invalid_Country']]=[1]
+        Country['seqnum']=Country.index+1
+        Country.drop(['COUNTRYNAME','Blank','Invalid'],axis=1,inplace=True)
+        Alldata.append(Country)
+
+        TOTAL_INVAL=((df1_COUNTRY['Invalid']=='Y')& (df1_COUNTRY['Blank']!='Y')).sum()
+        TOTAL_INVALD.append(TOTAL_INVAL)
+        INVALD_PCT =round((TOTAL_INVAL/TOTAL)*100,2)
+        INVALID_PCT.append(INVALD_PCT)
+
+        TOTAL_VAL =((df1_COUNTRY['Invalid']!='Y')& (df1_COUNTRY['Blank']!='Y')).sum()
+        TOTAL_VAL_REC=df1_COUNTRY[(df1_COUNTRY['Invalid']!='Y')& (df1_COUNTRY['Blank']!='Y')]
+
+        TOTAL_VALD.append(TOTAL_VAL)
+        VALD_PCT =round((TOTAL_VAL/TOTAL)*100,2)
+        VALID_PCT.append(VALD_PCT)
+
+        TOTAL_REC.append(TOTAL)
+
+        TOTAL_DUP=df1_COUNTRY[(df1_COUNTRY['Invalid']!='Y')& (df1_COUNTRY['Blank']!='Y')].duplicated(keep=False).sum()
+        TOTAL_DUPS.append(TOTAL_DUP)
+        PCT_DUP = round((TOTAL_DUP/TOTAL)*100,2)
+        PCT_DUPS.append(PCT_DUP)
+
+        TOTAL_UNQ=TOTAL_VAL -  TOTAL_DUP
+        TOTAL_UNIQUE.append(TOTAL_UNQ)
+        PCT_UNQ = round((TOTAL_UNQ/TOTAL)*100,2)
+        PCT_UNIQUE.append(PCT_UNQ)
+
+        TOTAL_INAPR.append(TOTAL_INVAL + TOT_BLK)
+        PER_INVALID.append(INVALD_PCT + PCT_BLK)
+
+        Tup=[GRADE, GRADE_COMMENT] = gradecheck(VALD_PCT)
+        Grade.append(Tup[0])
+        Grade_Comment.append(Tup[1])
+
+        df1_COUNTRY.drop(['Blank','Invalid'],axis=1,inplace=True)
+        df1_COUNTRY['COUNTRYNAME']=df1_COUNTRY['COUNTRYNAME'].replace('','Blank')
+        Freq=df1_COUNTRY.groupby(df1_COUNTRY['COUNTRYNAME']).size().to_frame(name='count').reset_index()
+
+        Freq1=Freq.sort_values(by='COUNTRYNAME',ascending=True).reset_index(drop=True)
+        Freq1['percent']=round((Freq1['count']/TOTAL) * 100,2)
+        Freq1=Freq1[Freq1.index < 25]
+
+        Dups=Freq.sort_values(by=['count','COUNTRYNAME'],ascending=(False,True)).reset_index(drop=True)
+        Dups['percent']=round((Dups['count']/TOTAL) *100,2)
+        Dups=Dups[Dups.index < 25]
+        varname=columnName
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+dupchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Dups.apply(IAtxt3_rec,axis=1)
+
+        def IAtxt3_rec(df):
+            prtfil1.write(varname+PIPE+alpchk+PIPE+df[columnName]+PIPE+Trans+PIPE+str(df['count'])+PIPE+str(df['percent'])+'%'+'\n')
+
+        with open(OUT3,'a') as prtfil1:
+             Freq1.apply(IAtxt3_rec,axis=1)
+
+        TOTAL_VAL_REC.drop(['Blank','Invalid'],axis=1,inplace=True)
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC[columnName]).size().to_frame(name='count').reset_index()
+        TOTAL_VAL_REC=TOTAL_VAL_REC.groupby(TOTAL_VAL_REC['count']).size().to_frame(name='count1').reset_index()
+        textfilegen(columnName)
+    else:
+        spreadsheetfile()
+
+print("TOTAL_REC:",TOTAL_REC)
+print("TOTAL_UNIQUE:",TOTAL_UNIQUE)
+print("PCT_UNIQUE:",PCT_UNIQUE)
+print("TOTAL_DUPS:",TOTAL_DUPS)
+print("PCT_DUPS:",PCT_DUPS)
+print("TOTAL_VALD:",TOTAL_VALD)
+print("VALID_PCT:",VALID_PCT)
+print("TOTAL_BLNK:",TOTAL_BLNK)
+print("PCT_BLNK:",PCT_BLNK)
+print("TOTAL_INVALD:",TOTAL_INVALD)
+print("INVALID_PCT:",INVALID_PCT)
+print("TOTAL_INAPR:",TOTAL_INAPR)
+print("PER_INVALID:",PER_INVALID)
+print("Grade:",Grade)
+print("Grade_Comment:",Grade_Comment)
+#Text File2 Creation
+
+full_array = np.array([varnames,TOTAL_REC,TOTAL_UNIQUE,PCT_UNIQUE,TOTAL_DUPS,PCT_DUPS,TOTAL_VALD,VALID_PCT, TOTAL_BLNK,PCT_BLNK,TOTAL_INVALD,INVALID_PCT,TOTAL_INAPR,PER_INVALID,Grade,Grade_Comment])
+array_fin = full_array.transpose()
+df=pd.DataFrame(array_fin,columns=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p'])
+
+PIPE='|'
+c='          '
+op='('
+cl=')'
+
+def IAtxt2_rec(df):
+    prtfile.write(df['a']+PIPE+c+df['b']+PIPE+'100%'+PIPE+c+df['c']+PIPE+df['d']+'%'+PIPE+c+df['e']+PIPE+df['f']+'%'+PIPE+c+df['g']+PIPE+df['h']+'%'+PIPE+c+df['i']
+                  +PIPE+df['j']+'%'+PIPE+c+df['k']+PIPE+df['l']+'%'+PIPE+c+df['m']+PIPE+df['n']+'%'+PIPE+c+df['o']+PIPE+op+df['p']+'% VALID'+cl+'\n')
+
+with open(OUT2,'w') as prtfile:
+     df.apply(IAtxt2_rec,axis=1)
+
+
+#Text File 1 creation
+
+full_array=np.array([varnames,Grade,VALID_PCT])
+array_fin = full_array.transpose()
+df=pd.DataFrame(array_fin,columns=['a','b','c'])
+
+def IAtxt1_rec(df):
+    prtfil1.write(df['a']+PIPE+df['b']+PIPE+c+df['c']+'\n')
+
+with open(OUT1,'w') as prtfil1:
+     df.apply(IAtxt1_rec,axis=1)
+
+
+#pd.set_option('display.max_rows',200)
+#Text file 5 Creation
+
+custdb=reduce(lambda left,right: pd.merge(left,right,on=['seqnum'],how='outer'),Alldata)
+custdb.drop('seqnum',axis=1,inplace=True)
+#print(custdb)
+VALIDITY = 100000000
+for i in varnames:
+    if i=='BUSINESS_NAME':
+         custdb['Invalid_Name']*=10000000
+         custdb['Invalid_Name']+=VALIDITY
+    elif i=='ADDRESSL1':
+         custdb['Invalid_Address1']*=1000000
+    elif i=='ADDRESSL2':
+         custdb['Invalid_Address2']*=100000
+    elif i=='CITY':
+         custdb['Invalid_City']*=10000
+    elif i=='STATE':
+         custdb['Invalid_State']*=1000
+    elif i=='ZIP':
+         custdb['Invalid_Zip']*=100
+    elif i=='PHONE':
+         custdb['Invalid_Phone']*=10
+    elif i=='COUNTRYNAME':
+         custdb['Invalid_Country']*=1
+
+
+custdb['Validity']=custdb.sum(axis=1)
+consolidate=custdb.sort_values(by='Validity',ascending=True).reset_index(drop=True)
+#pd.set_option('display.max_rows',200)
+#print(custdb)
+
+Summed=consolidate.groupby(consolidate['Validity']).size().to_frame(name='count').reset_index()
+Summed=Summed.sort_values(by='Validity',ascending=False).reset_index(drop=True)
+#print(Summed)
+Summed['Validity']=Summed['Validity'].astype(str)
+#initialzation empty dataframe
+df=pd.DataFrame(columns=['code_Name','code_Adr1','code_Adr2','code_City','code_State','code_Zip','code_Phone','code_Cntry'])
+
+for i in varnames:
+    if i=='BUSINESS_NAME':
+         df['BUSINESS_NAME']=Summed['Validity'].str.slice(1,2)
+    elif i=='ADDRESSL1':
+         df['ADDRESSL1']=Summed['Validity'].str.slice(2,3)
+    elif i=='ADDRESSL2':
+         df['ADDRESSL2']=Summed['Validity'].str.slice(3,4)
+    elif i=='CITY':
+         df['CITY']=Summed['Validity'].str.slice(4,5)
+    elif i=='STATE':
+         df['STATE']=Summed['Validity'].str.slice(5,6)
+    elif i=='ZIP':
+         df['ZIP']=Summed['Validity'].str.slice(6,7)
+    elif i=='PHONE':
+         df['PHONE']=Summed['Validity'].str.slice(7,8)
+    elif i=='COUNTRYNAME':
+         df['COUNTRY']=Summed['Validity'].str.slice(8,9)
+
+df=df.dropna(axis=1)
+df=df.replace(['0','1'],["VALID","INVALID"])
+df['count']=Summed['count']
+
+with open(OUT5,'w') as prtfil5:
+     prtfil5.write(df.to_csv(sep='|',index=False))
+
+#IA6 file creation logic
+Tot_Pct=sum(VALID_PCT)
+#print("Tot_Pct:",Tot_Pct)
+Tot_Num=len(VALID_PCT)
+#print("Tot_cnt:",Tot_Num)
+Ovr_Per=round(Tot_Pct/Tot_Num,2)
+Tup=[GRADE, GRADE_COMMENT] = gradecheck(Ovr_Per)
+Ovr_Grade=Tup[0]
+with open(OUT6,'w') as prtfil6:
+     prtfil6.write('0'+PIPE+str(Ovr_Grade)+PIPE+str(Ovr_Per)+'\n')
+
+logging.info("written in Analysis file completed")
